@@ -65,10 +65,10 @@
         .container {
             width: 100%;
             max-width: 600px;
-            margin: 80px auto 20px;
+            margin: 66px auto 0;
             background: #1e1e32;
             border-radius: 16px;
-            padding: 30px;
+            padding: 20px 20px 90px;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
             border: 1px solid #2e2e4e;
         }
@@ -83,7 +83,7 @@
 
         .roles-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 15px;
             margin-bottom: 30px;
         }
@@ -341,14 +341,29 @@
             transform: scale(0.95);
         }
 
+        .setup-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #1a1a2e;
+            padding: 12px 16px;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
+            border-top: 1px solid #2e2e4e;
+            z-index: 1000;
+        }
+
         .play-button {
             width: 100%;
-            padding: 20px;
+            max-width: 576px;
+            margin: 0 auto;
+            display: block;
+            padding: 18px;
             background: linear-gradient(135deg, #4a3fa0 0%, #6b2fa0 100%);
             color: #e0d0ff;
             border: none;
             border-radius: 10px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
@@ -369,6 +384,29 @@
             color: #555;
             cursor: not-allowed;
             box-shadow: none;
+        }
+
+        .oops-button {
+            margin-top: 16px;
+            padding: 10px 24px;
+            background: transparent;
+            color: #7070a0;
+            border: 1px solid #3a3a5e;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .oops-button:hover {
+            background: #2a2a42;
+            color: #a0a0c8;
+            border-color: #5a5a8e;
+        }
+
+        .oops-button:active {
+            transform: scale(0.96);
         }
 
         .word-category-label {
@@ -547,29 +585,65 @@
         }
 
         @media (max-width: 600px) {
-            .container {
-                padding: 20px;
+            .header {
+                padding: 10px 14px;
             }
 
             h1 {
-                font-size: 1.5em;
+                font-size: 1.15em;
+            }
+
+            .container {
+                margin-top: 50px;
+                border-radius: 0;
+                padding: 10px 10px 80px;
+                box-shadow: none;
+                border: none;
+                border-top: 1px solid #2e2e4e;
             }
 
             .roles-grid {
                 grid-template-columns: repeat(4, 1fr);
-                gap: 8px;
+                gap: 5px;
+                margin-bottom: 8px;
             }
 
             .role-button {
-                padding: 10px 6px;
+                padding: 6px 3px;
             }
 
             .role-emoji {
-                font-size: 24px;
+                font-size: 20px;
             }
 
             .role-label {
-                font-size: 8px;
+                font-size: 6.5px;
+                letter-spacing: 0.01em;
+            }
+
+            .categories-section {
+                margin-top: 6px;
+                margin-bottom: 0;
+            }
+
+            .setup-footer {
+                padding: 10px 12px;
+            }
+
+            .play-button {
+                padding: 15px;
+                font-size: 16px;
+            }
+        }
+
+        @media (min-width: 601px) and (max-width: 900px) {
+            .roles-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 10px;
+            }
+
+            .role-emoji {
+                font-size: 26px;
             }
         }
     </style>
@@ -590,7 +664,6 @@
                     <button class="category-cog-button" id="categoryCogButton">⚙️</button>
                 </div>
             </div>
-            <button class="play-button" id="playButton">Start Game</button>
         </div>
 
         <!-- Category Screen -->
@@ -608,6 +681,7 @@
                     <div class="word-selection" id="wordSelection"></div>
                     <div class="word-display" id="wordDisplay"></div>
                     <div class="timer" id="timer"></div>
+                    <button class="oops-button" id="oopsButton" style="display:none;">↩ Oops, volver</button>
                 </div>
                 <div class="outcome-buttons" id="outcomeButtons">
                     <button class="outcome-button success" id="wordGuessed">Word Guessed! (Werewolves find Seer)</button>
@@ -618,6 +692,10 @@
                 <button class="next-button" id="nextButton">Next</button>
             </div>
         </div>
+    </div>
+
+    <div class="setup-footer" id="setupFooter">
+        <button class="play-button" id="playButton">Start Game</button>
     </div>
 
     <script>
@@ -1036,11 +1114,13 @@
         function showCategoryScreen() {
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('categoryScreen').style.display = 'block';
+            document.getElementById('setupFooter').style.display = 'none';
         }
 
         function hideCategoryScreen() {
             document.getElementById('categoryScreen').style.display = 'none';
             document.getElementById('setupScreen').style.display = 'block';
+            document.getElementById('setupFooter').style.display = 'block';
         }
 
         // Toggle category selection
@@ -1067,9 +1147,22 @@
 
         // Toggle role selection
         function toggleRole(index) {
-            selectedRoles[index] = !selectedRoles[index];
             const button = document.querySelector(`[data-index="${index}"]`);
-            button.classList.toggle('active');
+            const type = button.dataset.type;
+
+            if (type === 'mason') {
+                // Masons are always toggled together — both or none
+                const newState = !selectedRoles[index];
+                document.querySelectorAll('[data-type="mason"]').forEach(btn => {
+                    const i = parseInt(btn.dataset.index);
+                    selectedRoles[i] = newState;
+                    btn.classList.toggle('active', newState);
+                });
+            } else {
+                selectedRoles[index] = !selectedRoles[index];
+                button.classList.toggle('active');
+            }
+
             updatePlayButton();
         }
 
@@ -1251,6 +1344,7 @@
             document.getElementById('setupScreen').style.display = 'none';
             document.getElementById('gameScreen').style.display = 'block';
             document.getElementById('headerResetButton').style.display = 'block';
+            document.getElementById('setupFooter').style.display = 'none';
         }
 
         // Show setup screen
@@ -1258,6 +1352,7 @@
             document.getElementById('setupScreen').style.display = 'block';
             document.getElementById('gameScreen').style.display = 'none';
             document.getElementById('headerResetButton').style.display = 'none';
+            document.getElementById('setupFooter').style.display = 'block';
         }
 
         // Display current phase
@@ -1481,10 +1576,12 @@
             const instructionText = document.getElementById('instructionText');
             const outcomeButtons = document.getElementById('outcomeButtons');
             const timerDisplay = document.getElementById('timer');
+            const oopsButton = document.getElementById('oopsButton');
 
             instructionText.textContent = 'Werewolves have 30 seconds to identify the Seer!';
             outcomeButtons.style.display = 'none';
             timerDisplay.style.display = 'block';
+            oopsButton.style.display = 'block';
             startTimer(30);
         }
 
@@ -1497,11 +1594,26 @@
             const instructionText = document.getElementById('instructionText');
             const outcomeButtons = document.getElementById('outcomeButtons');
             const timerDisplay = document.getElementById('timer');
+            const oopsButton = document.getElementById('oopsButton');
 
             instructionText.textContent = 'You have 1 minute to identify the Werewolves!';
             outcomeButtons.style.display = 'none';
             timerDisplay.style.display = 'block';
+            oopsButton.style.display = 'block';
             startTimer(60);
+        }
+
+        // Go back to outcome choice
+        function handleOops() {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            document.getElementById('instructionText').textContent = 'Averiguaron la palabra?';
+            document.getElementById('timer').style.display = 'none';
+            document.getElementById('oopsButton').style.display = 'none';
+            document.getElementById('outcomeButtons').style.display = 'flex';
         }
 
         // Event listeners
@@ -1512,6 +1624,7 @@
         document.getElementById('headerResetButton').addEventListener('click', resetGame);
         document.getElementById('wordGuessed').addEventListener('click', handleWordGuessed);
         document.getElementById('wordNotGuessed').addEventListener('click', handleWordNotGuessed);
+        document.getElementById('oopsButton').addEventListener('click', handleOops);
 
         // Initialize on load
         initGame();
