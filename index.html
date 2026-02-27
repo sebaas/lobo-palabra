@@ -641,6 +641,7 @@
         let selectedWord = '';
         let selectedWordCategory = '';
         let timerInterval = null;
+        let mayorRole = null;
 
         const wordCategories = {
             comida: ['PIZZA', 'HAMBURGUESA', 'TACO', 'SUSHI', 'PASTA', 'ENSALADA', 'CHOCOLATE', 'GALLETITAS', 'TORTA', 'PAN', 'ARROZ', 'PAELLA', 'LASAÑA', 'CEVICHE', 'EMPANADA', 'ASADO', 'STEAK', 'POLLO FRITO', 'RAMEN', 'CURRY', 'FALAFEL', 'HUMMUS', 'HOT DOG', 'NACHOS', 'BURRITO', 'GUACAMOLE', 'SOPA', 'SANGUCHE', 'KEBAB', 'FISH AND CHIPS', 'PASTEL DE CARNE', 'POLLO ASADO', 'TORTILLA DE PATATA', 'GAZPACHO', 'RISOTTO', 'GNOCCHI', 'RAVIOLI', 'NUGGETS', 'PAPA FRITA', 'PURE DE PAPA', 'ALBONDIGAS', 'CROQUETAS', 'AREPA', 'TAMAL', 'CHILAQUILES', 'ENCHILADAS', 'QUESADILLA', 'PANCETA', 'SALCHICHA', 'HUEVOS REVUELTOS', 'OMELETTE', 'CREPA', 'WAFFLE', 'PANQUEQUE', 'DONA', 'HELADO', 'CHURROS', 'ALFAJOR', 'FLAN', 'GELATINA', 'YOGUR', 'CEREAL', 'AVENA', 'BAGUETTE', 'PRETZEL', 'CROISSANT', 'MUFFIN', 'BROWNIE', 'TARTA DE MANZANA', 'SUSPIRO LIMENO', 'BACALAO', 'SALMON', 'ATUN', 'CAMARONES', 'LANGOSTA', 'PULPO'],
@@ -1102,11 +1103,38 @@
                 );
             }
 
+            const hasApprentice = selectedRoles.some((selected, index) => {
+                if (!selected) return false;
+                const button = document.querySelector(`[data-index="${index}"]`);
+                return button && button.dataset.type === 'apprentice';
+            });
+
+            mayorRole = null;
+
             if (hasFortuneTeller) {
                 const seerCloseIndex = gamePhases.findIndex(p => p.phase === 'seer-close');
                 gamePhases.splice(seerCloseIndex + 1, 0,
                     { phase: 'fortune-teller-open', text: 'Fortune Teller, abre los ojos...', type: 'show-hint' },
                     { phase: 'fortune-teller-close', text: 'Fortune Teller, cierra los ojos...', type: 'instruction' }
+                );
+            }
+
+            if (hasApprentice) {
+                // Ask the mayor for their secret role right after word selection
+                const mayorOpenIndex = gamePhases.findIndex(p => p.phase === 'mayor-open');
+                const mayorRoleOptions = [{ role: 'seer', label: 'Seer 🔮' }];
+                if (hasFortuneTeller) mayorRoleOptions.push({ role: 'fortune-teller', label: 'Fortune Teller 🃏' });
+                mayorRoleOptions.push({ role: 'other', label: 'Otro' });
+                gamePhases.splice(mayorOpenIndex + 1, 0,
+                    { phase: 'mayor-role-reveal', text: 'Mayor, ¿cuál es tu rol secreto?', type: 'mayor-role-selection', options: mayorRoleOptions }
+                );
+
+                // Apprentice opens after fortune-teller (if present) or seer
+                const apprenticeInsertAfter = hasFortuneTeller ? 'fortune-teller-close' : 'seer-close';
+                const apprenticeIndex = gamePhases.findIndex(p => p.phase === apprenticeInsertAfter);
+                gamePhases.splice(apprenticeIndex + 1, 0,
+                    { phase: 'apprentice-open', text: 'Apprentice, abre los ojos...', type: 'show-apprentice' },
+                    { phase: 'apprentice-close', text: 'Apprentice, cierra los ojos...', type: 'instruction' }
                 );
             }
 
@@ -1116,11 +1144,50 @@
                 return button && button.dataset.type === 'mason';
             });
             if (hasMason) {
-                const insertAfter = hasFortuneTeller ? 'fortune-teller-close' : 'seer-close';
+                let insertAfter = 'seer-close';
+                if (hasApprentice) insertAfter = 'apprentice-close';
+                else if (hasFortuneTeller) insertAfter = 'fortune-teller-close';
                 const insertIndex = gamePhases.findIndex(p => p.phase === insertAfter);
                 gamePhases.splice(insertIndex + 1, 0,
                     { phase: 'mason-open', text: 'Masons, abran los ojos y encuéntrense...', type: 'instruction' },
                     { phase: 'mason-close', text: 'Masons, cierren los ojos...', type: 'instruction' }
+                );
+            }
+
+            const hasThing = selectedRoles.some((selected, index) => {
+                if (!selected) return false;
+                const button = document.querySelector(`[data-index="${index}"]`);
+                return button && button.dataset.type === 'thing';
+            });
+            if (hasThing) {
+                let insertAfter = 'seer-close';
+                if (hasMason) insertAfter = 'mason-close';
+                else if (hasApprentice) insertAfter = 'apprentice-close';
+                else if (hasFortuneTeller) insertAfter = 'fortune-teller-close';
+                const insertIndex = gamePhases.findIndex(p => p.phase === insertAfter);
+                gamePhases.splice(insertIndex + 1, 0,
+                    { phase: 'thing-open', text: 'The Thing, abre los ojos y toca el hombro de alguien cercano...', type: 'instruction' },
+                    { phase: 'thing-close', text: 'The Thing, cierra los ojos...', type: 'instruction' }
+                );
+            }
+
+            const hasBeholder = selectedRoles.some((selected, index) => {
+                if (!selected) return false;
+                const button = document.querySelector(`[data-index="${index}"]`);
+                return button && button.dataset.type === 'beholder';
+            });
+            if (hasBeholder) {
+                const visibleRoles = ['Seer'];
+                if (hasFortuneTeller) visibleRoles.push('Fortune Teller');
+                if (hasApprentice) visibleRoles.push('Apprentice');
+                const last = visibleRoles.pop();
+                const rolesText = visibleRoles.length > 0
+                    ? visibleRoles.join(', ') + ' y ' + last
+                    : last;
+                const discussionIndex = gamePhases.findIndex(p => p.phase === 'discussion');
+                gamePhases.splice(discussionIndex, 0,
+                    { phase: 'beholder-open', text: `Beholder, abre los ojos. ${rolesText}, levanten la mano...`, type: 'instruction' },
+                    { phase: 'beholder-close', text: 'Beholder, cierra los ojos...', type: 'instruction' }
                 );
             }
 
@@ -1202,9 +1269,34 @@
                 case 'show-hint':
                     if (selectedWord) {
                         const hint = getWordHint(selectedWord);
-                        wordDisplay.innerHTML = `<span class="word-upside-down word-hint">${hint}</span><div class="word-divider"></div><span class="word-hint">${hint}</span>`;
+                        wordDisplay.innerHTML = `<span class="word-upside-down word-hint">${hint}<span class="word-category-label">${selectedWordCategory}</span></span><div class="word-divider"></div><span class="word-hint">${hint}<span class="word-category-label">${selectedWordCategory}</span></span>`;
                         wordDisplay.style.display = 'flex';
                     }
+                    break;
+
+                case 'mayor-role-selection':
+                    wordSelection.style.display = 'flex';
+                    wordSelection.innerHTML = '';
+                    phase.options.forEach(({ role, label }) => {
+                        const btn = document.createElement('button');
+                        btn.className = 'word-button';
+                        btn.textContent = label;
+                        btn.addEventListener('click', () => selectMayorRole(role));
+                        wordSelection.appendChild(btn);
+                    });
+                    nextButton.style.display = 'none';
+                    break;
+
+                case 'show-apprentice':
+                    if (mayorRole === 'seer' && selectedWord) {
+                        wordDisplay.innerHTML = `<span class="word-upside-down">${selectedWord}<span class="word-category-label">${selectedWordCategory}</span></span><div class="word-divider"></div><span>${selectedWord}<span class="word-category-label">${selectedWordCategory}</span></span>`;
+                        wordDisplay.style.display = 'flex';
+                    } else if (mayorRole === 'fortune-teller' && selectedWord) {
+                        const apprenticeHint = getWordHint(selectedWord);
+                        wordDisplay.innerHTML = `<span class="word-upside-down word-hint">${apprenticeHint}<span class="word-category-label">${selectedWordCategory}</span></span><div class="word-divider"></div><span class="word-hint">${apprenticeHint}<span class="word-category-label">${selectedWordCategory}</span></span>`;
+                        wordDisplay.style.display = 'flex';
+                    }
+                    // If 'other': just instruction text, nothing shown
                     break;
 
                 case 'timer':
@@ -1244,6 +1336,20 @@
         function selectWord(word, category) {
             selectedWord = word;
             selectedWordCategory = category;
+            playBeep();
+            currentPhaseIndex++;
+            displayCurrentPhase();
+        }
+
+        // Mayor declares their secret role for the Apprentice
+        function selectMayorRole(role) {
+            mayorRole = role;
+            const apprenticePhase = gamePhases.find(p => p.phase === 'apprentice-open');
+            if (apprenticePhase) {
+                if (role === 'seer') apprenticePhase.text = 'Apprentice, abre los ojos y mira la palabra...';
+                else if (role === 'fortune-teller') apprenticePhase.text = 'Apprentice, abre los ojos y mira la pista...';
+                else apprenticePhase.text = 'Apprentice, abre los ojos...';
+            }
             playBeep();
             currentPhaseIndex++;
             displayCurrentPhase();
@@ -1290,6 +1396,10 @@
                 playFortuneTellerSound();
             } else if (nextPhase && nextPhase.phase === 'mason-open') {
                 playMasonSound();
+            } else if (nextPhase && nextPhase.phase === 'apprentice-open') {
+                if (mayorRole === 'seer') playSeerSound();
+                else if (mayorRole === 'fortune-teller') playFortuneTellerSound();
+                else playBeep();
             } else if (nextPhase && nextPhase.phase === 'discussion') {
                 playFinalBeep();
             } else {
