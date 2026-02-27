@@ -747,6 +747,41 @@
             shriek.stop(now + 1.2);
         }
 
+        // Play ghostly mirror/echo doppleganger sound
+        function playDopplegangerSound() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const now = audioContext.currentTime;
+
+            // Two identical echoed notes — the "double"
+            [0, 0.28].forEach(delay => {
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, now + delay);
+                osc.frequency.exponentialRampToValueAtTime(220, now + delay + 0.7);
+                gain.gain.setValueAtTime(0, now + delay);
+                gain.gain.linearRampToValueAtTime(delay === 0 ? 0.3 : 0.15, now + delay + 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + delay + 0.7);
+                osc.connect(gain);
+                gain.connect(audioContext.destination);
+                osc.start(now + delay);
+                osc.stop(now + delay + 0.7);
+            });
+
+            // Eerie high shimmer underneath
+            const shimmer = audioContext.createOscillator();
+            const shimmerGain = audioContext.createGain();
+            shimmer.type = 'triangle';
+            shimmer.frequency.setValueAtTime(880, now);
+            shimmer.frequency.linearRampToValueAtTime(660, now + 1.0);
+            shimmerGain.gain.setValueAtTime(0.07, now);
+            shimmerGain.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+            shimmer.connect(shimmerGain);
+            shimmerGain.connect(audioContext.destination);
+            shimmer.start(now);
+            shimmer.stop(now + 1.0);
+        }
+
         // Play evil minion sound (like werewolf but higher and lighter)
         function playMinionSound() {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -910,11 +945,11 @@
             harmony.stop(now + 1.06);
         }
 
-        // Generate word hint: first letter + __ for each word (max 2 words)
-        // e.g. "LEON" → "L__"   "BUENOS AIRES" → "B__  A__"
+        // Generate word hint: first letter + __ for every word
+        // e.g. "LEON" → "L__"   "MARTIN LUTHER KING" → "M__  L__  K__"
         function getWordHint(word) {
             const parts = word.trim().split(/\s+/);
-            return parts.slice(0, 2).map(w => w[0] + '__').join('   ');
+            return parts.map(w => w[0] + '__').join('   ');
         }
 
         // Initialize the game
@@ -1108,8 +1143,21 @@
                 const button = document.querySelector(`[data-index="${index}"]`);
                 return button && button.dataset.type === 'apprentice';
             });
+            const hasDoppleganger = selectedRoles.some((selected, index) => {
+                if (!selected) return false;
+                const button = document.querySelector(`[data-index="${index}"]`);
+                return button && button.dataset.type === 'doppleganger';
+            });
 
             mayorRole = null;
+
+            if (hasDoppleganger) {
+                const mayorCloseIndex = gamePhases.findIndex(p => p.phase === 'mayor-close');
+                gamePhases.splice(mayorCloseIndex + 1, 0,
+                    { phase: 'doppleganger-open', text: 'Doppleganger, abre los ojos. Mira la carta de otra persona y compórtate como ese rol...', type: 'instruction' },
+                    { phase: 'doppleganger-close', text: 'Doppleganger, cierra los ojos...', type: 'instruction' }
+                );
+            }
 
             if (hasFortuneTeller) {
                 const seerCloseIndex = gamePhases.findIndex(p => p.phase === 'seer-close');
@@ -1386,7 +1434,9 @@
         function nextPhase() {
             // Check which phase we're transitioning to and play the appropriate sound
             const nextPhase = gamePhases[currentPhaseIndex + 1];
-            if (nextPhase && nextPhase.phase === 'werewolves-open') {
+            if (nextPhase && nextPhase.phase === 'doppleganger-open') {
+                playDopplegangerSound();
+            } else if (nextPhase && nextPhase.phase === 'werewolves-open') {
                 playWerewolfSound();
             } else if (nextPhase && nextPhase.phase === 'minion-open') {
                 playMinionSound();
